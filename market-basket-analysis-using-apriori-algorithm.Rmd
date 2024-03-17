@@ -1,0 +1,193 @@
+---
+title: "market-basket-analysis-using-apriori-algorithm"
+author: "sirius_ife"
+date: "2024-03-16"
+output: html_document
+---
+
+## Apriori Algorithm Implementation in R using 'arules' library
+
+Association mining is usually done on transactions data from a retail market or from an online e-commerce store. Since most transactions data is large, the apriori algorithm makes it easier to find these patterns or rules quickly. Association Rules are widely used to analyze retail basket or transaction data, and are intended to identify strong rules discovered in transaction data using measures of interestingness, based on the concept of strong rules.
+
+Apriori uses a "bottom up" approach, where frequent subsets are extended one item at a time (a step known as candidate generation), and groups of candidates are tested against the data. The algorithm terminates when no further successful extensions are found.
+
+![](https://wikimedia.org/api/rest_v1/media/math/render/svg/549fa6a5f46897d137b5d704ef7f30b6ba36d4de)
+
+## Import Required libraries
+
+```{r}
+if(sessionInfo()['basePkgs']=="dplyr" | sessionInfo()['otherPkgs']=="dplyr"){
+  detach(package:dplyr, unload=TRUE)
+}
+
+if(sessionInfo()['basePkgs']=="tm" | sessionInfo()['otherPkgs']=="tm"){
+  detach(package:sentiment, unload=TRUE)
+  detach(package:tm, unload=TRUE)
+}
+
+library(plyr)
+library(arules)
+library(arulesViz)
+```
+
+## Import the dataset
+
+```{r}
+groceries <- read.csv("Groceries_dataset.csv")
+class(groceries)
+```
+
+## Data Cleaning and Exploration
+
+```{r}
+str(groceries)
+```
+
+```{r}
+head(groceries)
+```
+
+### Checking for NA values
+
+```{r}
+sum(is.na(groceries))
+```
+
+### Sort groceries
+
+```{r}
+sorted <- groceries[order(groceries$Member_number),]
+```
+
+### Converting feature "member_number" to num
+
+```{r}
+sorted$Member_number <- as.numeric(sorted$Member_number)
+str(sorted)
+```
+
+### Group all the items that were bought together by the same customer on the same date
+
+```{r}
+itemList <- ddply(sorted, c("Member_number","Date"), function(df1)paste(df1$itemDescription,collapse = ","))
+                  
+head(itemList,15)
+```
+
+### Remove member number and date
+
+```{r}
+itemList$Member_number <- NULL
+itemList$Date <- NULL
+colnames(itemList) <- c("itemList")
+```
+
+```{r}
+write.csv(itemList,"ItemList.csv", quote = FALSE, row.names = TRUE)
+head(itemList)
+```
+
+## Convert CSV file to Basket Format
+
+```{r}
+txn = read.transactions(file="ItemList.csv", rm.duplicates= TRUE, format="basket",sep=",",cols=1);
+print(txn)
+```
+
+There are in total 14,964 transactions with 168 distinct products.
+
+### Remove quotes from Transaction
+
+```{r}
+txn@itemInfo$labels <- gsub("\"","",txn@itemInfo$labels)
+```
+
+## Apriori Algorithm
+
+The apriori() generates the most relevent set of rules from a given transaction data. It also shows the support, confidence and lift of those rules. These three measure can be used to decide the relative strength of the rules. So what do these terms mean?
+
+Lets consider the rule X => Y in order to compute these metrics.
+
+![](https://s3.ap-south-1.amazonaws.com/techleer/243.jpg)
+
+```{r}
+basket_rules <- apriori(txn, parameter = list(minlen=2, sup = 0.001, conf = 0.05, target="rules"))
+```
+
+### Total rules generated
+
+```{r}
+print(length(basket_rules))
+```
+
+```{r}
+summary(basket_rules)
+```
+
+### Inspecting the basket rules
+
+```{r}
+inspect(basket_rules[1:20])
+```
+
+## Visualizing the Association Rules
+
+```{r}
+plot(basket_rules, jitter = 0)
+```
+
+```{r}
+plot(basket_rules, method = "grouped", control = list(k = 5))
+```
+
+### Graph of first 20 rules
+
+```{r}
+plot(basket_rules[1:20], method="graph")
+```
+
+### Graph of first 50 rules
+
+```{r}
+plot(basket_rules[1:50], method="graph")
+```
+
+### Parallel coordinates plot
+
+```{r}
+plot(basket_rules[1:20], method="paracoord")
+```
+
+## Most Frequent Products
+
+```{r}
+itemFrequencyPlot(txn, topN = 10)
+```
+
+## Changing hyperparameters
+
+```{r}
+basket_rules2 <- apriori(txn, parameter = list(minlen=3, sup = 0.001, conf = 0.1, target="rules"))
+```
+
+```{r}
+print(length(basket_rules2))
+```
+
+```{r}
+summary(basket_rules2)
+```
+
+```{r}
+inspect(basket_rules2)
+```
+
+```{r}
+plot(basket_rules2, method="graph")
+```
+
+```{r}
+plot(basket_rules2, method="paracoord")
+```
+
+
